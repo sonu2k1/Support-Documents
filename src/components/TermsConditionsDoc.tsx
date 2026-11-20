@@ -19,13 +19,13 @@ export const TermsConditionsDoc: React.FC<DocProps> = ({ info, highlight }) => {
     );
   };
 
-  // Helper to highlight sample messages
+  // Purple highlight specifically for Sample Messages as requested by user
   const renderSampleMessage = (msg: string) => {
     if (!highlight) {
       return <span className="whitespace-pre-wrap">{msg}</span>;
     }
     return (
-      <mark className="bg-amber-100/90 text-amber-950 px-1.5 py-0.5 rounded border border-amber-300 whitespace-pre-wrap leading-relaxed inline">
+      <mark className="bg-purple-100/90 text-purple-950 px-1.5 py-0.5 rounded border border-purple-300 whitespace-pre-wrap leading-relaxed inline">
         {msg}
       </mark>
     );
@@ -93,7 +93,7 @@ export const TermsConditionsDoc: React.FC<DocProps> = ({ info, highlight }) => {
         </ul>
       </section>
 
-      {/* Sample Message – (Dynamic List of Sample Messages with Highlight) */}
+      {/* Sample Message – (Dynamic List with Purple Highlight) */}
       <section className="mb-6">
         <h3 className="text-[17px] font-bold text-black mb-3">
           Sample Message –
