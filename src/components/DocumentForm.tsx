@@ -43,6 +43,56 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
     });
   };
 
+  // Sync Website URL in Sample Messages whenever Website URL is changed
+  const handleWebsiteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUrl = e.target.value;
+    const oldUrl = formData.website;
+
+    const updatedSamples = formData.sampleMessages.map((item) => {
+      let msg = item.message;
+      // 1. Replace exact old URL if present
+      if (oldUrl && oldUrl.trim() && msg.includes(oldUrl.trim())) {
+        msg = msg.replaceAll(oldUrl.trim(), newUrl);
+      } else {
+        // 2. Replace any http/https URL in the sample message with the new URL
+        msg = msg.replace(/https?:\/\/[^\s]+(?=[.,]?(\s|$))/gi, newUrl);
+      }
+      return {
+        ...item,
+        message: msg,
+      };
+    });
+
+    onChange({
+      ...formData,
+      website: newUrl,
+      sampleMessages: updatedSamples,
+    });
+  };
+
+  // Sync DBA / Brand Name in Sample Messages whenever DBA is changed
+  const handleDbaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newBrand = e.target.value;
+    const oldBrand = formData.dba.trim();
+
+    const updatedSamples = formData.sampleMessages.map((item) => {
+      let msg = item.message;
+      if (oldBrand && newBrand) {
+        msg = msg.replaceAll(oldBrand, newBrand);
+      }
+      return {
+        ...item,
+        message: msg,
+      };
+    });
+
+    onChange({
+      ...formData,
+      dba: newBrand,
+      sampleMessages: updatedSamples,
+    });
+  };
+
   // Strictly enforce only numbers & optional leading + for phone number
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -248,13 +298,13 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
             type="text"
             name="dba"
             value={formData.dba}
-            onChange={handleChange}
+            onChange={handleDbaChange}
             placeholder="e.g. BrightStar Care (defaults to Legal Company if blank)"
             className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium text-slate-800 transition"
           />
         </div>
 
-        {/* Website */}
+        {/* Website URL (Auto-syncs in sample messages) */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1">
             Website URL <span className="text-rose-500">*</span>
@@ -265,7 +315,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
               type="url"
               name="website"
               value={formData.website}
-              onChange={handleChange}
+              onChange={handleWebsiteChange}
               placeholder="https://www.example.com"
               className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium text-slate-800 transition"
               required
@@ -438,11 +488,11 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
               <button
                 type="button"
                 onClick={handleRegenerateSamples}
-                title="Reset sample messages to default"
+                title="Reset sample messages to default using current brand & website"
                 className="text-[11px] font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition"
               >
                 <RefreshCw className="w-3 h-3" />
-                Reset
+                Sync / Reset
               </button>
               <button
                 type="button"
