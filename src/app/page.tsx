@@ -80,8 +80,8 @@ export default function Home() {
             </div>
             <ol className="list-decimal pl-4 space-y-1 text-indigo-800 leading-relaxed text-[11.5px]">
               <li>Edit company info, custom fields, or sample messages on the left.</li>
-              <li>Right panel live preview automatically reflects all changes in real time.</li>
-              <li>Both panels scroll independently for ease of editing.</li>
+              <li>Click <strong>&quot;Google Doc&quot;</strong> in the top-right toolbar to create a live shareable Google Doc link!</li>
+              <li>Generated Google Doc link automatically populates into the SMS Consent Form.</li>
               <li>Download individual PDFs or click <strong>Download All 3</strong> for a ZIP bundle.</li>
             </ol>
           </div>
@@ -91,6 +91,7 @@ export default function Home() {
         <div className="lg:col-span-8 xl:col-span-8 h-full flex flex-col overflow-hidden">
           <DocumentViewer
             formData={formData}
+            setFormData={setFormData}
             activeDoc={activeDoc}
             setActiveDoc={setActiveDoc}
             highlightFields={highlightFields}
