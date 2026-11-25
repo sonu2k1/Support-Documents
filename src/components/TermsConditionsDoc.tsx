@@ -8,6 +8,9 @@ interface DocProps {
 
 export const TermsConditionsDoc: React.FC<DocProps> = ({ info, highlight }) => {
   const brand = info.dba.trim() || info.legalCompany || "[Brand / Legal Company]";
+  const privacyUrl =
+    info.privacyPolicyUrl?.trim() ||
+    `${(info.website || "").replace(/\/+$/, "")}/privacy-policy`;
 
   const mark = (val: string, fallback: string = "") => {
     const text = val || fallback;
@@ -177,12 +180,16 @@ export const TermsConditionsDoc: React.FC<DocProps> = ({ info, highlight }) => {
         <p className="text-black leading-normal mb-2">
           Your privacy is important to us. We do not sell, rent, or share your personal information with third parties for marketing purposes. No mobile information will be shared with third parties or affiliates for marketing or promotional purposes. Text messaging originator opt-in data and consent will not be shared with any third parties except as required to provide messaging services. For more information, please review our
         </p>
-        <div className="inline-flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
-          <span className="text-blue-500 text-xs">📄</span>
-          <span className="font-bold text-[#1155cc] underline cursor-pointer">
-            Privacy Policy- {mark(brand)}
-          </span>
-          <span className="text-slate-400">|</span>
+        <div className="inline-flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded border border-slate-300 max-w-full">
+          <span className="text-blue-500 text-xs flex-shrink-0">📄</span>
+          <a
+            href={privacyUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="font-bold text-[#1155cc] underline break-all hover:text-blue-800"
+          >
+            {mark(privacyUrl, "[Privacy Policy URL]")}
+          </a>
         </div>
       </section>
 

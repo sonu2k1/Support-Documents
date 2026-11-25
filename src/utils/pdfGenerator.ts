@@ -369,12 +369,18 @@ export function generateTermsPdf(info: CompanyInfo): jsPDF {
 
   doc.setTextColor(...COLOR_LINK);
   doc.setFont("times", "bold");
-  const policyLink = `Privacy Policy - ${brand}`;
-  doc.text(policyLink, margin + 6, y);
-  doc.setDrawColor(...COLOR_LINK);
-  doc.setLineWidth(0.7);
-  doc.line(margin + 6, y + 1.5, margin + 6 + doc.getTextWidth(policyLink), y + 1.5);
-  y += 18;
+  const privacyUrl =
+    info.privacyPolicyUrl?.trim() ||
+    `${(info.website || "").replace(/\/+$/, "")}/privacy-policy`;
+  const policyLines = doc.splitTextToSize(privacyUrl, contentWidth - 12);
+  checkPage(policyLines.length * 15 + 10);
+  doc.text(policyLines, margin + 6, y);
+  policyLines.forEach((line: string, idx: number) => {
+    doc.setDrawColor(...COLOR_LINK);
+    doc.setLineWidth(0.7);
+    doc.line(margin + 6, y + idx * 15 + 1.5, margin + 6 + doc.getTextWidth(line), y + idx * 15 + 1.5);
+  });
+  y += policyLines.length * 15 + 6;
 
   // Supported Carriers
   addHeading("Supported Carriers");

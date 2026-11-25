@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, content, webhookUrl } = body;
+    const { title, content, blocks, webhookUrl } = body;
 
     const targetUrl = webhookUrl || "https://script.google.com/a/macros/emitrr.com/s/AKfycbxwWOIA3j-zT097hVF3pUHqigm5e6b9AHurtxSSmk1rU2F_7xY_6zGJIQvigSCzxWlmTw/exec";
 
@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         title: title || "Compliance Document",
         content: content || "",
+        blocks: Array.isArray(blocks) ? blocks : undefined,
       }),
       redirect: "follow",
     });

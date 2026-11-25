@@ -5,7 +5,7 @@ import { TermsConditionsDoc } from "./TermsConditionsDoc";
 import { ConsentFormDoc } from "./ConsentFormDoc";
 import { downloadPdf, downloadPdfFromEditedElement, downloadAllPdfsZip } from "../utils/pdfGenerator";
 import { downloadDocx } from "../utils/docxGenerator";
-import { getCleanDocumentText } from "../utils/textExtractor";
+import { getStructuredDocumentData } from "../utils/textExtractor";
 import { 
   FileText, 
   Download, 
@@ -110,13 +110,11 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
     try {
       const hasOverride = Boolean(manualHtmlOverrides[activeDoc]) || isEditingManually;
-      let { title, content } = getCleanDocumentText(activeDoc, formData);
-      if (hasOverride && docContainerRef.current) {
-        const liveText = docContainerRef.current.innerText.trim();
-        if (liveText) {
-          content = liveText;
-        }
-      }
+      const { title, content, blocks } = getStructuredDocumentData(
+        activeDoc,
+        formData,
+        hasOverride ? docContainerRef.current : null
+      );
 
       const res = await fetch("/api/create-google-doc", {
         method: "POST",
@@ -124,6 +122,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         body: JSON.stringify({
           title,
           content,
+          blocks,
           webhookUrl,
         }),
       });

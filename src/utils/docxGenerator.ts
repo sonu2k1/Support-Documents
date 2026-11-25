@@ -354,7 +354,7 @@ export function generateTermsDocx(info: CompanyInfo): Document {
             spacing: { before: 200, after: 120 },
           }),
           new Paragraph({
-            text: `Your privacy is important to us. We do not sell, rent, or share your personal information with third parties for marketing purposes. No mobile information will be shared with third parties or affiliates for marketing or promotional purposes. Text messaging originator opt-in data and consent will not be shared with any third parties except as required to provide messaging services. For more information, please review our Privacy Policy - ${brand}.`,
+            text: `Your privacy is important to us. We do not sell, rent, or share your personal information with third parties for marketing purposes. No mobile information will be shared with third parties or affiliates for marketing or promotional purposes. Text messaging originator opt-in data and consent will not be shared with any third parties except as required to provide messaging services. For more information, please review our Privacy Policy: ${info.privacyPolicyUrl?.trim() || `${(info.website || "").replace(/\/+$/, "")}/privacy-policy`}.`,
             spacing: { after: 200 },
           }),
           new Paragraph({
