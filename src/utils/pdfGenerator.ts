@@ -589,6 +589,85 @@ export function generateConsentPdf(info: CompanyInfo): jsPDF {
   return doc;
 }
 
+export function downloadPdfFromEditedElement(
+  type: ActiveDocType,
+  info: CompanyInfo,
+  rootEl: HTMLElement
+) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 54;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin + 10;
+
+  const checkPage = (needed: number) => {
+    if (y + needed > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  const blocks = rootEl.querySelectorAll("h1, h2, h3, p, li");
+  blocks.forEach((el) => {
+    const tag = el.tagName.toLowerCase();
+    const text = (el.textContent || "").replace(/\s+/g, " ").trim();
+    if (!text) return;
+
+    if (tag === "h1") {
+      checkPage(34);
+      doc.setFont("times", "bold");
+      doc.setFontSize(20);
+      doc.setTextColor(...COLOR_TITLE);
+      const lines = doc.splitTextToSize(text, contentWidth);
+      doc.text(lines, pageWidth / 2, y, { align: "center" });
+      y += lines.length * 24 + 4;
+    } else if (tag === "h2" || tag === "h3") {
+      y += 4;
+      checkPage(26);
+      doc.setFont("times", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(...COLOR_HEADING);
+      const lines = doc.splitTextToSize(text, contentWidth);
+      doc.text(lines, margin, y);
+      y += lines.length * 17 + 4;
+    } else if (tag === "li") {
+      doc.setFont("times", "normal");
+      doc.setFontSize(10.5);
+      doc.setTextColor(...COLOR_TEXT);
+      const lines = doc.splitTextToSize(text, contentWidth - 16);
+      checkPage(lines.length * 15 + 4);
+      doc.text("•", margin + 4, y);
+      doc.text(lines, margin + 16, y);
+      y += lines.length * 15 + 3;
+    } else {
+      const isCentered =
+        el.classList.contains("text-center") ||
+        text.toLowerCase().startsWith("effective date:");
+      doc.setFont("times", isCentered ? "bold" : "normal");
+      doc.setFontSize(10.5);
+      doc.setTextColor(...COLOR_TEXT);
+      const lines = doc.splitTextToSize(text, contentWidth);
+      checkPage(lines.length * 15 + 4);
+      if (isCentered) {
+        doc.text(lines, pageWidth / 2, y, { align: "center" });
+      } else {
+        doc.text(lines, margin, y);
+      }
+      y += lines.length * 15 + 4;
+    }
+  });
+
+  const cleanName = (info.dba || info.legalCompany).replace(/[^a-zA-Z0-9]/g, "_");
+  const prefix =
+    type === "privacy"
+      ? "Privacy_Policy"
+      : type === "terms"
+        ? "SMS_Terms_and_Conditions"
+        : "SMS_Consent_Authorization";
+  doc.save(`${prefix}_${cleanName}.pdf`);
+}
+
 export function downloadPdf(type: ActiveDocType, info: CompanyInfo) {
   let doc: jsPDF;
   let filename = "";

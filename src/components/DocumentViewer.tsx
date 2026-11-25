@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { CompanyInfo, ActiveDocType } from "../types/document";
 import { PrivacyPolicyDoc } from "./PrivacyPolicyDoc";
 import { TermsConditionsDoc } from "./TermsConditionsDoc";
 import { ConsentFormDoc } from "./ConsentFormDoc";
-import { downloadPdf, downloadAllPdfsZip } from "../utils/pdfGenerator";
+import { downloadPdf, downloadPdfFromEditedElement, downloadAllPdfsZip } from "../utils/pdfGenerator";
 import { downloadDocx } from "../utils/docxGenerator";
 import { getCleanDocumentText } from "../utils/textExtractor";
 import { 
@@ -22,7 +22,8 @@ import {
   Copy,
   Check,
   X,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from "lucide-react";
 
 interface DocumentViewerProps {
@@ -42,6 +43,48 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 }) => {
   const [zoom, setZoom] = useState<number>(100);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  // Manual full-document editing state
+  const docContainerRef = useRef<HTMLDivElement>(null);
+  const [isEditingManually, setIsEditingManually] = useState<boolean>(false);
+  const [manualHtmlOverrides, setManualHtmlOverrides] = useState<
+    Partial<Record<ActiveDocType, string>>
+  >({});
+  const [docResetKey, setDocResetKey] = useState<number>(0);
+
+  const saveCurrentManualEdits = () => {
+    if (isEditingManually && docContainerRef.current) {
+      setManualHtmlOverrides((prev) => ({
+        ...prev,
+        [activeDoc]: docContainerRef.current!.innerHTML,
+      }));
+    }
+  };
+
+  const handleToggleEditManually = () => {
+    if (isEditingManually) {
+      saveCurrentManualEdits();
+      setIsEditingManually(false);
+    } else {
+      setIsEditingManually(true);
+    }
+  };
+
+  const handleResetManualEdits = () => {
+    setManualHtmlOverrides((prev) => {
+      const next = { ...prev };
+      delete next[activeDoc];
+      return next;
+    });
+    setDocResetKey((k) => k + 1);
+    setIsEditingManually(false);
+  };
+
+  const handleSwitchDoc = (doc: ActiveDocType) => {
+    saveCurrentManualEdits();
+    setIsEditingManually(false);
+    setActiveDoc(doc);
+  };
 
   // Google Doc Integration States
   const defaultWebhookUrl = "https://script.google.com/a/macros/emitrr.com/s/AKfycbxwWOIA3j-zT097hVF3pUHqigm5e6b9AHurtxSSmk1rU2F_7xY_6zGJIQvigSCzxWlmTw/exec";
@@ -66,7 +109,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     setCreatedDocUrl("");
 
     try {
-      const { title, content } = getCleanDocumentText(activeDoc, formData);
+      const hasOverride = Boolean(manualHtmlOverrides[activeDoc]) || isEditingManually;
+      let { title, content } = getCleanDocumentText(activeDoc, formData);
+      if (hasOverride && docContainerRef.current) {
+        const liveText = docContainerRef.current.innerText.trim();
+        if (liveText) {
+          content = liveText;
+        }
+      }
 
       const res = await fetch("/api/create-google-doc", {
         method: "POST",
@@ -124,7 +174,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   };
 
   const handleDownloadPdf = () => {
-    downloadPdf(activeDoc, formData);
+    const hasOverride = Boolean(manualHtmlOverrides[activeDoc]) || isEditingManually;
+    if (hasOverride && docContainerRef.current) {
+      downloadPdfFromEditedElement(activeDoc, formData, docContainerRef.current);
+    } else {
+      downloadPdf(activeDoc, formData);
+    }
   };
 
   const handleDownloadDocx = async () => {
@@ -156,7 +211,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         {/* Document Selection Tabs */}
         <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
           <button
-            onClick={() => setActiveDoc("privacy")}
+            onClick={() => handleSwitchDoc("privacy")}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
               activeDoc === "privacy"
                 ? "bg-white text-indigo-600 shadow-sm"
@@ -167,7 +222,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             1. Privacy Policy
           </button>
           <button
-            onClick={() => setActiveDoc("terms")}
+            onClick={() => handleSwitchDoc("terms")}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
               activeDoc === "terms"
                 ? "bg-white text-indigo-600 shadow-sm"
@@ -178,7 +233,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             2. SMS Terms & Conditions
           </button>
           <button
-            onClick={() => setActiveDoc("consent")}
+            onClick={() => handleSwitchDoc("consent")}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
               activeDoc === "consent"
                 ? "bg-white text-indigo-600 shadow-sm"
@@ -211,14 +266,18 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             </button>
           </div>
 
-          {/* NEW: ☁️ Google Doc Link Button */}
+          {/* Google Docs Link Button */}
           <button
             onClick={handleCreateGoogleDoc}
             title="Create live Google Doc link in your Google Drive"
-            className="px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 rounded-lg flex items-center gap-1.5 transition shadow-xs"
+            className="px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-1.5 transition shadow-xs active:scale-95"
           >
-            <Cloud className="w-3.5 h-3.5 text-blue-600" />
-            Google Doc
+            <img
+              src="/google-docs-icon.png"
+              alt="Google Docs"
+              className="w-4 h-4 object-contain flex-shrink-0"
+            />
+            Google Docs
           </button>
 
           {/* DOCX button */}
@@ -245,10 +304,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           {/* Download Current PDF */}
           <button
             onClick={handleDownloadPdf}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-1.5 shadow-sm transition active:scale-95"
+            className="px-3 py-1.5 text-xs font-semibold text-black bg-[#F8CE46] hover:bg-[#f0c22e] rounded-lg flex items-center gap-2 shadow-sm transition active:scale-95"
           >
-            <Download className="w-3.5 h-3.5" />
-            Download PDF
+            <span>Download PDF</span>
+            <span className="w-4 h-4 rounded-full bg-black flex items-center justify-center flex-shrink-0">
+              <Download className="w-2.5 h-2.5 text-[#F8CE46]" />
+            </span>
           </button>
 
           {/* Download All 3 ZIP */}
@@ -265,7 +326,57 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
       </div>
 
       {/* Document Content Viewport */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center custom-scrollbar">
+      <div className="relative flex-1 overflow-y-auto p-4 sm:p-8 flex flex-col items-center custom-scrollbar">
+        {/* Top-Right Floating Edit Manually Controls */}
+        <div className="sticky top-0 z-20 w-full flex justify-end items-center gap-2 mb-3 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-2">
+            {isEditingManually && (
+              <span className="hidden sm:inline text-[11px] font-medium text-purple-700 bg-white/95 backdrop-blur-xs border border-purple-200 px-3 py-1.5 rounded-full shadow-xs">
+                Click anywhere in doc to edit
+              </span>
+            )}
+            {Boolean(manualHtmlOverrides[activeDoc]) && (
+              <button
+                type="button"
+                onClick={handleResetManualEdits}
+                title="Discard manual edits and restore template"
+                className="h-10 px-3 text-xs font-semibold text-rose-600 bg-white/95 hover:bg-rose-50 border border-rose-200 rounded-full shadow-sm flex items-center gap-1.5 transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset Edits
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleToggleEditManually}
+              title={isEditingManually ? "Save manual edits" : "Edit document manually"}
+              className={`group h-10 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-300 ease-out active:scale-95 ${
+                isEditingManually
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white px-4 gap-1.5"
+                  : "bg-[#F8CE46] hover:bg-[#f0c22e] text-black px-2.5 hover:px-3.5"
+              }`}
+            >
+              {isEditingManually ? (
+                <>
+                  <Check className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs font-semibold whitespace-nowrap">Done Editing</span>
+                </>
+              ) : (
+                <>
+                  <img
+                    src="/edit-manually-icon.png"
+                    alt="Edit Manually"
+                    className="w-5 h-5 object-contain flex-shrink-0 transition-transform duration-300 ease-out group-hover:scale-110"
+                  />
+                  <span className="max-w-0 opacity-0 group-hover:max-w-[120px] group-hover:opacity-100 group-hover:ml-2 overflow-hidden whitespace-nowrap text-xs font-semibold text-black transition-all duration-300 ease-out">
+                    Edit Manually
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
         <div
           style={{
             transform: `scale(${zoom / 100})`,
@@ -274,15 +385,37 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           }}
           className="w-full max-w-[850px] pb-16"
         >
-          {activeDoc === "privacy" && (
-            <PrivacyPolicyDoc info={formData} highlight={highlightFields} />
-          )}
-          {activeDoc === "terms" && (
-            <TermsConditionsDoc info={formData} highlight={highlightFields} />
-          )}
-          {activeDoc === "consent" && (
-            <ConsentFormDoc info={formData} highlight={highlightFields} />
-          )}
+          <div
+            ref={docContainerRef}
+            key={`${activeDoc}-${docResetKey}`}
+            contentEditable={isEditingManually}
+            suppressContentEditableWarning={true}
+            className={`transition-all rounded-sm ${
+              isEditingManually
+                ? "ring-2 ring-purple-500/70 ring-offset-4 ring-offset-slate-200/70 outline-none cursor-text"
+                : ""
+            }`}
+          >
+            {manualHtmlOverrides[activeDoc] ? (
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: manualHtmlOverrides[activeDoc] || "",
+                }}
+              />
+            ) : (
+              <>
+                {activeDoc === "privacy" && (
+                  <PrivacyPolicyDoc info={formData} highlight={highlightFields} />
+                )}
+                {activeDoc === "terms" && (
+                  <TermsConditionsDoc info={formData} highlight={highlightFields} />
+                )}
+                {activeDoc === "consent" && (
+                  <ConsentFormDoc info={formData} highlight={highlightFields} />
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 

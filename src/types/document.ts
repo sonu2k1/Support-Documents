@@ -30,8 +30,8 @@ export interface CompanyInfo {
 export type ActiveDocType = 'privacy' | 'terms' | 'consent';
 
 export function getDefaultSampleMessagesList(brand: string, website: string): SampleMessageItem[] {
-  const b = brand || "BrightStar Care";
-  const w = website || "https://www.brightstarcare.com/west-portland";
+  const b = brand || "Example Brand";
+  const w = website || "https://www.example.com";
   return [
     {
       id: "sample-1",
@@ -52,15 +52,15 @@ export function getDefaultSampleMessagesList(brand: string, website: string): Sa
 }
 
 export const INITIAL_COMPANY_DATA: CompanyInfo = {
-  legalCompany: "LJC & COMPANY HEALTHCARE LLC",
-  dba: "BrightStar Care",
-  website: "https://www.brightstarcare.com/west-portland",
-  businessAddress: "1675 SW Marlow ave, Portland Oregon 97225",
-  phoneNumber: "+15036206011",
-  email: "staffing-westptld@brightstarcare.com",
+  legalCompany: "Example Company LLC",
+  dba: "Example Brand",
+  website: "https://www.example.com",
+  businessAddress: "123 Main Street, Suite 100, Austin, TX 78701",
+  phoneNumber: "+15551234567",
+  email: "support@example.com",
   effectiveDate: "July 2026",
-  privacyPolicyUrl: "https://www.brightstarcare.com/west-portland/privacy-policy",
-  termsUrl: "https://www.brightstarcare.com/west-portland/terms-and-conditions",
-  sampleMessages: getDefaultSampleMessagesList("BrightStar Care", "https://www.brightstarcare.com/west-portland"),
+  privacyPolicyUrl: "https://www.example.com/privacy-policy",
+  termsUrl: "https://www.example.com/terms-and-conditions",
+  sampleMessages: getDefaultSampleMessagesList("Example Brand", "https://www.example.com"),
   customFields: [],
 };

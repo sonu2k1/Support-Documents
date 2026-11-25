@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { CompanyInfo, SampleMessageItem, CustomField, getDefaultSampleMessagesList } from "../types/document";
+import { extractCompanyInfoFromImage, fileToDataUrl } from "../utils/imageExtractor";
 import { 
   Building2, 
   Globe, 
@@ -18,7 +19,10 @@ import {
   Trash2,
   SlidersHorizontal,
   Edit3,
-  Check
+  Check,
+  ImagePlus,
+  Loader2,
+  X
 } from "lucide-react";
 
 interface DocumentFormProps {
@@ -37,6 +41,127 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
   // Collapsed by default as requested: user clicks button to edit
   const [showSampleMessages, setShowSampleMessages] = useState<boolean>(false);
   const [showCustomFields, setShowCustomFields] = useState<boolean>(true);
+
+  // Screenshot Auto-Fill state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExtracting, setIsExtracting] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [extractStatus, setExtractStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+    previewUrl?: string;
+  } | null>(null);
+
+  const processScreenshotFile = useCallback(
+    async (file: File | Blob) => {
+      if (!file.type.startsWith("image/")) {
+        setExtractStatus({
+          type: "error",
+          message: "Please upload a valid image file (PNG, JPG, WebP).",
+        });
+        return;
+      }
+
+      setIsExtracting(true);
+      setExtractStatus(null);
+
+      try {
+        const previewUrl = await fileToDataUrl(file);
+        const result = await extractCompanyInfoFromImage(file);
+        const { data, filledCount } = result;
+
+        if (filledCount === 0) {
+          setExtractStatus({
+            type: "error",
+            message: "Could not detect company fields in this image. Please try a clearer screenshot.",
+            previewUrl,
+          });
+          return;
+        }
+
+        const nextLegal = data.legalCompany || formData.legalCompany;
+        const nextDba = data.dba || formData.dba;
+        const nextWebsite = data.website || formData.website;
+        const nextAddress = data.businessAddress || formData.businessAddress;
+        const nextPhone = data.phoneNumber || formData.phoneNumber;
+        const nextEmail = data.email || formData.email;
+
+        // Sync new Website & DBA into sample messages
+        const oldUrl = formData.website.trim();
+        const oldBrand = formData.dba.trim();
+        const updatedSamples = formData.sampleMessages.map((item) => {
+          let msg = item.message;
+          if (nextWebsite && oldUrl && msg.includes(oldUrl)) {
+            msg = msg.replaceAll(oldUrl, nextWebsite);
+          } else if (nextWebsite) {
+            msg = msg.replace(/https?:\/\/[^\s]+(?=[.,]?(\s|$))/gi, nextWebsite);
+          }
+          if (nextDba && oldBrand && msg.includes(oldBrand)) {
+            msg = msg.replaceAll(oldBrand, nextDba);
+          }
+          return { ...item, message: msg };
+        });
+
+        // Update Privacy/Terms URLs if they were still on example.com
+        const cleanSite = nextWebsite.replace(/\/+$/, "");
+        const nextPrivacyUrl =
+          !formData.privacyPolicyUrl || formData.privacyPolicyUrl.includes("example.com")
+            ? `${cleanSite}/privacy-policy`
+            : formData.privacyPolicyUrl;
+        const nextTermsUrl =
+          !formData.termsUrl || formData.termsUrl.includes("example.com")
+            ? `${cleanSite}/terms-and-conditions`
+            : formData.termsUrl;
+
+        onChange({
+          ...formData,
+          legalCompany: nextLegal,
+          dba: nextDba,
+          website: nextWebsite,
+          businessAddress: nextAddress,
+          phoneNumber: nextPhone,
+          email: nextEmail,
+          privacyPolicyUrl: nextPrivacyUrl,
+          termsUrl: nextTermsUrl,
+          sampleMessages: updatedSamples,
+        });
+
+        setExtractStatus({
+          type: "success",
+          message: `Auto-filled ${filledCount} field${filledCount > 1 ? "s" : ""} from screenshot`,
+          previewUrl,
+        });
+      } catch (err) {
+        setExtractStatus({
+          type: "error",
+          message: err instanceof Error ? err.message : "Failed to extract info from image.",
+        });
+      } finally {
+        setIsExtracting(false);
+      }
+    },
+    [formData, onChange]
+  );
+
+  // Allow pasting a screenshot anywhere on the page (Cmd+V / Ctrl+V)
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          const blob = items[i].getAsFile();
+          if (blob) {
+            e.preventDefault();
+            processScreenshotFile(blob);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [processScreenshotFile]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -174,37 +299,37 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
     onChange({ ...formData, customFields: updated });
   };
 
-  // --- Presets ---
-  const loadPreset = (preset: "brightstar" | "expresspros") => {
-    if (preset === "brightstar") {
-      const brand = "BrightStar Care";
-      const site = "https://www.brightstarcare.com/west-portland";
+  // --- Test Data Presets ---
+  const loadPreset = (preset: "healthcare" | "staffing") => {
+    if (preset === "healthcare") {
+      const brand = "Example Brand";
+      const site = "https://www.example.com";
       onChange({
-        legalCompany: "LJC & COMPANY HEALTHCARE LLC",
+        legalCompany: "Example Company LLC",
         dba: brand,
         website: site,
-        businessAddress: "1675 SW Marlow ave, Portland Oregon 97225",
-        phoneNumber: "+15036206011",
-        email: "staffing-westptld@brightstarcare.com",
+        businessAddress: "123 Main Street, Suite 100, Austin, TX 78701",
+        phoneNumber: "+15551234567",
+        email: "support@example.com",
         effectiveDate: "July 2026",
-        privacyPolicyUrl: "https://www.brightstarcare.com/west-portland/privacy-policy",
-        termsUrl: "https://www.brightstarcare.com/west-portland/terms-and-conditions",
+        privacyPolicyUrl: "https://www.example.com/privacy-policy",
+        termsUrl: "https://www.example.com/terms-and-conditions",
         sampleMessages: getDefaultSampleMessagesList(brand, site),
         customFields: [],
       });
     } else {
-      const brand = "Express Employment Professionals";
-      const site = "https://www.expresspros.com/us-pennsylvania-westmoreland-fayette";
+      const brand = "Example Staffing";
+      const site = "https://www.example-staffing.com";
       onChange({
-        legalCompany: "PSJK Associates Inc",
+        legalCompany: "Example Staffing LLC",
         dba: brand,
         website: site,
-        businessAddress: "4012 Rt 130, Irvin, Pennsylvania -15642",
-        phoneNumber: "+17243927190",
-        email: "haily.rotharmel@expresspros.com",
+        businessAddress: "450 Market Street, Suite 200, Chicago, IL 60601",
+        phoneNumber: "+15559876543",
+        email: "contact@example-staffing.com",
         effectiveDate: "July 2026",
-        privacyPolicyUrl: "https://docs.google.com/document/d/1EbWTdTx5RZDd1im4DmZxuI7gcJsgvs5jH5E9oXR2nYg/edit?usp=sharing",
-        termsUrl: "https://docs.google.com/document/d/1Niz7bdT-J9WSnfwXNAzn5UTKPWWmryeSbV5YbzprCQA/edit?usp=sharing",
+        privacyPolicyUrl: "https://www.example-staffing.com/privacy-policy",
+        termsUrl: "https://www.example-staffing.com/terms-and-conditions",
         sampleMessages: getDefaultSampleMessagesList(brand, site),
         customFields: [],
       });
@@ -251,21 +376,106 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
           </button>
         </div>
 
-        {/* Quick Presets */}
+        {/* Quick Test Presets */}
         <div className="flex flex-wrap gap-2 pt-3">
           <button
-            onClick={() => loadPreset("brightstar")}
+            onClick={() => loadPreset("healthcare")}
             className="px-2.5 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg border border-indigo-200/60 flex items-center gap-1.5 transition-colors"
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-            Preset: BrightStar Care
+            Test Data: Healthcare
           </button>
           <button
-            onClick={() => loadPreset("expresspros")}
+            onClick={() => loadPreset("staffing")}
             className="px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg border border-slate-200 flex items-center gap-1.5 transition-colors"
           >
-            Preset: ExpressPros
+            Test Data: Staffing
           </button>
+        </div>
+
+        {/* Auto-Fill from Screenshot Dropzone */}
+        <div className="pt-3">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) processScreenshotFile(file);
+            }}
+            className={`relative rounded-xl border-2 border-dashed p-3 transition-all ${
+              isDragging
+                ? "border-indigo-500 bg-indigo-50/70"
+                : "border-slate-200 bg-slate-50/80 hover:border-indigo-300 hover:bg-indigo-50/30"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) processScreenshotFile(file);
+                e.target.value = "";
+              }}
+            />
+
+            <button
+              type="button"
+              disabled={isExtracting}
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center gap-2.5 text-left disabled:opacity-60"
+            >
+              <div className="w-8 h-8 rounded-lg bg-[#F8CE46] flex items-center justify-center flex-shrink-0 shadow-xs">
+                {isExtracting ? (
+                  <Loader2 className="w-4 h-4 text-black animate-spin" />
+                ) : (
+                  <ImagePlus className="w-4 h-4 text-black" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-800 truncate">
+                  {isExtracting ? "Scanning screenshot..." : "Auto-Fill from Screenshot"}
+                </div>
+                <div className="text-[11px] text-slate-500 truncate">
+                  Upload, drag & drop, or paste (Cmd+V)
+                </div>
+              </div>
+            </button>
+
+            {extractStatus && (
+              <div
+                className={`mt-2.5 px-2.5 py-1.5 rounded-lg text-[11px] flex items-center justify-between gap-2 ${
+                  extractStatus.type === "success"
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : "bg-rose-50 text-rose-800 border border-rose-200"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {extractStatus.previewUrl && (
+                    <img
+                      src={extractStatus.previewUrl}
+                      alt="Uploaded screenshot"
+                      className="w-6 h-6 rounded object-cover border border-black/10 flex-shrink-0"
+                    />
+                  )}
+                  <span className="truncate font-medium">{extractStatus.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExtractStatus(null)}
+                  className="p-0.5 hover:bg-black/5 rounded flex-shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -283,7 +493,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
               name="legalCompany"
               value={formData.legalCompany}
               onChange={handleChange}
-              placeholder="e.g. LJC & COMPANY HEALTHCARE LLC"
+              placeholder="e.g. Example Company LLC"
               className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium text-slate-800 transition"
               required
             />
@@ -300,7 +510,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
             name="dba"
             value={formData.dba}
             onChange={handleDbaChange}
-            placeholder="e.g. BrightStar Care (defaults to Legal Company if blank)"
+            placeholder="e.g. Example Brand (defaults to Legal Company if blank)"
             className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium text-slate-800 transition"
           />
         </div>
